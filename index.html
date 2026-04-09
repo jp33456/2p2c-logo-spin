@@ -23,7 +23,7 @@
 </head>
 <body>
   <canvas id="c"></canvas>
-  <div id="hint">drag to spin</div>
+  <div id="hint">drag left or right to spin</div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -56,70 +56,83 @@
     rim.position.set(-4, -2, -3);
     scene.add(rim);
 
-    let model = null;
+    // pivot is a parent object — rotating it spins the model around the bottom edge
+    const pivot = new THREE.Object3D();
+    scene.add(pivot);
 
     const gltfLoader = new THREE.GLTFLoader();
     gltfLoader.load(
       'https://jp33456.github.io/2p2c-logo-spin/2p2c3D.glb',
       (gltf) => {
-        model = gltf.scene;
+        const model = gltf.scene;
+
+        // compute bounding box to find bottom and center
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
         const scale = 2.5 / maxDim;
-        model.position.sub(center.multiplyScalar(scale));
+
         model.scale.setScalar(scale);
-        scene.add(model);
+
+        // recompute box after scale
+        const scaledBox = new THREE.Box3().setFromObject(model);
+        const scaledMin = scaledBox.min;
+        const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+
+        // shift model so its bottom sits at y=0 and it is centered on x/z
+        model.position.set(
+          -scaledCenter.x,
+          -scaledMin.y,
+          -scaledCenter.z
+        );
+
+        pivot.add(model);
+
+        // move pivot down so the model appears centered vertically in the viewport
+        const scaledSize = scaledBox.getSize(new THREE.Vector3());
+        pivot.position.y = -(scaledSize.y * scale) / 2;
       },
       undefined,
       (err) => console.error('GLB load error:', err)
     );
 
-    let rotY = 0, rotX = 0;
-    let velY = 0.004, velX = 0;
+    let rotY = 0;
+    let velY = 0.004;
     let dragging = false;
-    let lastX = 0, lastY = 0;
+    let lastX = 0;
     let hinted = false;
     const hint = document.getElementById('hint');
 
-    function startDrag(x, y) {
+    function startDrag(x) {
       dragging = true;
-      lastX = x; lastY = y;
+      lastX = x;
       if (!hinted) { hint.style.opacity = '0'; hinted = true; }
     }
-    function moveDrag(x, y) {
+    function moveDrag(x) {
       if (!dragging) return;
       velY = (x - lastX) * 0.012;
-      velX = (y - lastY) * 0.008;
       rotY += velY;
-      rotX += velX;
-      rotX = Math.max(-0.6, Math.min(0.6, rotX));
-      lastX = x; lastY = y;
+      lastX = x;
     }
     function endDrag() { dragging = false; }
 
-    window.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
-    window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+    window.addEventListener('mousedown', e => startDrag(e.clientX));
+    window.addEventListener('mousemove', e => moveDrag(e.clientX));
     window.addEventListener('mouseup', endDrag);
-    window.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
-    window.addEventListener('touchmove', e => moveDrag(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
+    window.addEventListener('touchstart', e => startDrag(e.touches[0].clientX), {passive:true});
+    window.addEventListener('touchmove', e => moveDrag(e.touches[0].clientX), {passive:true});
     window.addEventListener('touchend', endDrag);
 
     function animate() {
       requestAnimationFrame(animate);
       if (!dragging) {
         velY *= 0.94;
-        velX *= 0.94;
         if (Math.abs(velY) < 0.002) velY += 0.004;
         rotY += velY;
-        rotX += velX;
-        rotX = Math.max(-0.6, Math.min(0.6, rotX));
       }
-      if (model) {
-        model.rotation.y = rotY;
-        model.rotation.x = rotX;
-      }
+      // only Y rotation — spins around vertical axis anchored at the bottom
+      pivot.rotation.y = rotY;
       renderer.render(scene, camera);
     }
     animate();
