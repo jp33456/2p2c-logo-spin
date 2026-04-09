@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2P2C 3D Logo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+    canvas { display: block; width: 100% !important; height: 100% !important; }
+    #hint {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(120,120,120,0.7);
+      font-family: sans-serif;
+      font-size: 13px;
+      pointer-events: none;
+      transition: opacity 1s;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hint">drag to spin</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script>
+    const renderer = new THREE.WebGLRenderer({
+      canvas: document.getElementById('c'),
+      antialias: true,
+      alpha: true
+    });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 4;
+
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(amb);
+    const key = new THREE.DirectionalLight(0xffffff, 1.2);
+    key.position.set(4, 4, 5);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xffd080, 0.5);
+    rim.position.set(-4, -2, -3);
+    scene.add(rim);
+
+    let model = null;
+
+    const gltfLoader = new THREE.GLTFLoader();
+    gltfLoader.load(
+      'https://jp33456.github.io/2p2c-logo-spin/2p2c3D.glb',
+      (gltf) => {
+        model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 2.5 / maxDim;
+        model.position.sub(center.multiplyScalar(scale));
+        model.scale.setScalar(scale);
+        scene.add(model);
+      },
+      undefined,
+      (err) => console.error('GLB load error:', err)
+    );
+
+    let rotY = 0, rotX = 0;
+    let velY = 0.004, velX = 0;
+    let dragging = false;
+    let lastX = 0, lastY = 0;
+    let hinted = false;
+    const hint = document.getElementById('hint');
+
+    function startDrag(x, y) {
+      dragging = true;
+      lastX = x; lastY = y;
+      if (!hinted) { hint.style.opacity = '0'; hinted = true; }
+    }
+    function moveDrag(x, y) {
+      if (!dragging) return;
+      velY = (x - lastX) * 0.012;
+      velX = (y - lastY) * 0.008;
+      rotY += velY;
+      rotX += velX;
+      rotX = Math.max(-0.6, Math.min(0.6, rotX));
+      lastX = x; lastY = y;
+    }
+    function endDrag() { dragging = false; }
+
+    window.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
+    window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
+    window.addEventListener('touchmove', e => moveDrag(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
+    window.addEventListener('touchend', endDrag);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!dragging) {
+        velY *= 0.94;
+        velX *= 0.94;
+        if (Math.abs(velY) < 0.002) velY += 0.004;
+        rotY += velY;
+        rotX += velX;
+        rotX = Math.max(-0.6, Math.min(0.6, rotX));
+      }
+      if (model) {
+        model.rotation.y = rotY;
+        model.rotation.x = rotX;
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
