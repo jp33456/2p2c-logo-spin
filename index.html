@@ -39,10 +39,8 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-
-    // Camera looks straight at the model front-on, slightly elevated
-    camera.position.set(0, 1.2, 5);
-    camera.lookAt(0, 1.2, 0);
+    camera.position.set(0, 0, 5);
+    camera.lookAt(0, 0, 0);
 
     window.addEventListener('resize', () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -68,9 +66,6 @@
       (gltf) => {
         const model = gltf.scene;
 
-        // Fix Blender Z-up to Three.js Y-up
-        model.rotation.x = -Math.PI / 2;
-
         // Scale to fit
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
@@ -78,7 +73,7 @@
         const scale = 2.5 / maxDim;
         model.scale.setScalar(scale);
 
-        // Recompute after rotation + scale
+        // Recompute after scale
         const box2 = new THREE.Box3().setFromObject(model);
         const center2 = box2.getCenter(new THREE.Vector3());
         const min2 = box2.min;
@@ -92,7 +87,7 @@
 
         pivot.add(model);
 
-        // Shift pivot so model is nicely centered in view
+        // Shift pivot so model is centered in view
         const box3 = new THREE.Box3().setFromObject(pivot);
         const size3 = box3.getSize(new THREE.Vector3());
         pivot.position.y = -size3.y * 0.5;
