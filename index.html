@@ -39,7 +39,10 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.z = 4;
+
+    // Camera looks straight at the model front-on, slightly elevated
+    camera.position.set(0, 1.2, 5);
+    camera.lookAt(0, 1.2, 0);
 
     window.addEventListener('resize', () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -56,7 +59,6 @@
     rim.position.set(-4, -2, -3);
     scene.add(rim);
 
-    // pivot is a parent object — rotating it spins the model around the bottom edge
     const pivot = new THREE.Object3D();
     scene.add(pivot);
 
@@ -66,32 +68,34 @@
       (gltf) => {
         const model = gltf.scene;
 
-        // compute bounding box to find bottom and center
+        // Fix Blender Z-up to Three.js Y-up
+        model.rotation.x = -Math.PI / 2;
+
+        // Scale to fit
         const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
         const scale = 2.5 / maxDim;
-
         model.scale.setScalar(scale);
 
-        // recompute box after scale
-        const scaledBox = new THREE.Box3().setFromObject(model);
-        const scaledMin = scaledBox.min;
-        const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+        // Recompute after rotation + scale
+        const box2 = new THREE.Box3().setFromObject(model);
+        const center2 = box2.getCenter(new THREE.Vector3());
+        const min2 = box2.min;
 
-        // shift model so its bottom sits at y=0 and it is centered on x/z
+        // Anchor bottom of model at y=0, center on x/z
         model.position.set(
-          -scaledCenter.x,
-          -scaledMin.y,
-          -scaledCenter.z
+          -center2.x,
+          -min2.y,
+          -center2.z
         );
 
         pivot.add(model);
 
-        // move pivot down so the model appears centered vertically in the viewport
-        const scaledSize = scaledBox.getSize(new THREE.Vector3());
-        pivot.position.y = -(scaledSize.y * scale) / 2;
+        // Shift pivot so model is nicely centered in view
+        const box3 = new THREE.Box3().setFromObject(pivot);
+        const size3 = box3.getSize(new THREE.Vector3());
+        pivot.position.y = -size3.y * 0.5;
       },
       undefined,
       (err) => console.error('GLB load error:', err)
@@ -131,7 +135,6 @@
         if (Math.abs(velY) < 0.002) velY += 0.004;
         rotY += velY;
       }
-      // only Y rotation — spins around vertical axis anchored at the bottom
       pivot.rotation.y = rotY;
       renderer.render(scene, camera);
     }
